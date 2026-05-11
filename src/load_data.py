@@ -3,6 +3,11 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 
+import torch
+from torch.utils.data import Dataset, DataLoader
+import torch.nn as nn
+import torch.optim as optim
+
 
 def load_train_data():
     """
@@ -93,6 +98,25 @@ def load_train_data():
 
 
 
+class CustomTabularDataset(Dataset):
+    def __init__(self, X, y):
+        self.X = torch.tensor(X, dtype=torch.float32)
+        self.y = torch.tensor(y.values, dtype=torch.float32)
+        self.y = self.y.unsqueeze(-1)
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
+
+
+
 if __name__ == "__main__":
-    load_train_data()
-    #print(sys.argv)
+    X_train, X_test, y_train, y_test = load_train_data()
+
+    train_set = CustomTabularDataset(X_train, y_train)
+
+    X, y = train_set[1]
+    print(X.shape)
+
