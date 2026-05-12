@@ -8,7 +8,6 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
 import torch.optim as optim
 
-
 def load_train_data():
     """
     input: none
@@ -17,10 +16,6 @@ def load_train_data():
     train_path = "./data/train.csv"
 
     df = pd.read_csv(train_path)
-    # print(f"{df.head()}")
-    # print(f"this is shape: {df.shape}")
-    # print(f"this is dtypes: {df.dtypes}")
-    # print(f"this is sum(): {df.isnull().sum()}")
 
     ### Data Frame Preparation
     ## the overall goal is going to be:
@@ -42,12 +37,15 @@ def load_train_data():
     # use pd.to_numeric to convert the num column to numerical values and no longer string
     renamed_cols["num"] = pd.to_numeric(renamed_cols["num"])
 
+    # Extract GroupId for better data filling logic
+    df_extracted = df["PassengerId"].str.split(pat="_", expand=True)
+    group_id_col = df_extracted[0].rename("GroupId")
+
     # drop the irrelevant columns from original df
     df_dropped = df.drop(labels=["PassengerId", "Name", "Cabin"], axis=1)
-    # concatenate the dropped df and the 3 new cols from splitted_cols
-    combined_df = pd.concat([df_dropped, renamed_cols], axis="columns")
 
-    #print(combined_df.head())
+    # concatenate the dropped df, the cabin cols, and the GroupId
+    combined_df = pd.concat([group_id_col, df_dropped, renamed_cols], axis="columns")
 
     ## next in this part we will go over all features (cols) that have missing entries
     ## and fill the up with simple median (numerical) or mode (boolean) values
@@ -56,44 +54,47 @@ def load_train_data():
     numerical_cols = ["Age", "RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck", "num"]
     mode_cols = ["HomePlanet", "Destination", "CryoSleep", "VIP", "deck", "side"]
 
-    # fill the up with median values
-    combined_df = combined_df.fillna(combined_df[numerical_cols].median())
+    # calculate the median values based on GroupId - fill numericals
+    fill_in_medians = combined_df.groupby("GroupId")[numerical_cols].transform('median')
+    combined_df[numerical_cols] = combined_df[numerical_cols].fillna(fill_in_medians)
 
-    # cols for mode, # more difficult than before, # mode() seems to return a df where the rows
-    # contain the info we need so that's why we need to .iloc[0] to get the first row (most common)
-    combined_df = combined_df.fillna(combined_df[mode_cols].mode().iloc[0])
-
-    #print(f"this is combined_df.sum(): {combined_df.isnull().sum()}")
-    #print(combined_df.head())
-
-    # split categories into multiple columns, quite crazy but works
-    one_hotted_df = pd.get_dummies(
-        combined_df[["HomePlanet", "Destination", "deck", "side"]], dtype=int)
+    # create a helper function for mode since pandas transform is picky with it
+    def get_mode(x):
+        m = x.mode()
+        return m.iloc[0] if not m.empty else np.nan
     
-    # drop the labels that we have one hotted anyway and will concatenate them next
+    # fill in categorical modes based on GroupId
+    fill_in_modes = combined_df.groupby("GroupId")[mode_cols].transform(get_mode)
+    combined_df[mode_cols] = combined_df[mode_cols].fillna(fill_in_modes)
+
+    # fill remaining empties (people traveling alone) with global averages
+    combined_df[mode_cols] = combined_df[mode_cols].fillna(combined_df[mode_cols].mode().iloc[0])
+    combined_df[numerical_cols] = combined_df[numerical_cols].fillna(combined_df[numerical_cols].median())
+
+    # split categories into multiple columns
+    one_hotted_df = pd.get_dummies(combined_df[["HomePlanet", "Destination", "deck", "side"]], dtype=int)
+    
+    # drop the labels that we have one hotted anyway
     combined_df = combined_df.drop(labels=["HomePlanet", "Destination", "deck", "side"], axis=1)
 
-    # this does not need to be concatenated it happens within the combined df 
-    # true/false was replaced by 0/1
-    combined_df[["CryoSleep", "VIP", "Transported"]] = combined_df[["CryoSleep", "VIP", "Transported"]].astype("int32")
+    # turn true/false features into 1/0 values
+    bool_cols = ["CryoSleep", "VIP", "Transported"]
+    combined_df[bool_cols] = combined_df[bool_cols].astype(int)
 
-    # concatenate the one_hotted cols with the rest together 
+    # concatenate everything together and force float32 to prevent memory fragments
+    # We explicitly drop GroupId here because XGBoost cannot handle string/object types
     final_df = pd.concat([combined_df, one_hotted_df], axis="columns")
-
-    #print(final_df)
+    final_df = final_df.drop(columns=["GroupId"]).astype("float32")
 
     ## Next goal will be to extract the inputs (X) and targets (Y) from this dataframe
 
     # separate train data X from target col y
     X, y = final_df.drop(columns=["Transported"]), final_df["Transported"]
 
-
     # split for training purposes
-    X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     return X_train, X_test, y_train, y_test
-
 
 
 

@@ -8,14 +8,15 @@ import numpy as np
 
 # Create and train model
 def train_xgboost(X_train, y_train):
-    model = model = XGBClassifier(
+    model = XGBClassifier(
     colsample_bytree=0.5,
     gamma=0.25,
     learning_rate=0.01,
     max_depth=8,
     n_estimators=1000,
     subsample=0.9
-)
+    )
+    
     model.fit(X_train, y_train)
 
     return model
