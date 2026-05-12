@@ -10,6 +10,7 @@ from src.models.training_loop import training_loop
 
 # generate the data from the dataframe prepared in load_data.py
 X_train, X_test, y_train, y_test = load_train_data()
+# print(X_train.dtypes)
 
 #### Train and evaluate a random forest model ###
 
@@ -18,14 +19,16 @@ X_train, X_test, y_train, y_test = load_train_data()
 # # evaluate the random forest model we have
 # accuracy, report = evaluate_random_forest(trained_rf, X_test, y_test)
 
-### Train and evaluate xgboost model ###
-
-# trained_xg = train_xgboost(X_train, y_train)
-# accuracy , report = evaluate_xgboost(trained_xg, X_test, y_test)
-
 # print(report)
 
-## gridsearch for xgboost model
+### Train and evaluate xgboost model ###
+
+trained_xg = train_xgboost(X_train, y_train)
+accuracy, report = evaluate_xgboost(trained_xg, X_test, y_test)
+
+print(report)
+
+# gridsearch for xgboost model
 
 # best_params_, best_score_ = grid_train_xgboost(X_train=X_train, y_train=y_train)
 
@@ -33,28 +36,28 @@ X_train, X_test, y_train, y_test = load_train_data()
 # print(f"Best score: {best_score_} ")
 
 
-### Train an FNN model ###
+# ### Train an FNN model ###
 
-# first we scale the data to be always between 0 and 1
-X_scaler = StandardScaler()
-X_train_scaled = X_scaler.fit_transform(X_train)
-# now we scale x_test based on the SAME scalar
-X_test_scaled = X_scaler.transform(X_test)
+# # first we scale the data to be always between 0 and 1
+# X_scaler = StandardScaler()
+# X_train_scaled = X_scaler.fit_transform(X_train)
+# # now we scale x_test based on the SAME scalar
+# X_test_scaled = X_scaler.transform(X_test)
 
 
-# now import datasets 
+# # now import datasets 
 
-train_set = CustomTabularDataset(X_train_scaled, y_train)
-test_set = CustomTabularDataset(X_test_scaled, y_test)
+# train_set = CustomTabularDataset(X_train_scaled, y_train)
+# test_set = CustomTabularDataset(X_test_scaled, y_test)
 
-# now create the dataloaders 
+# # now create the dataloaders 
 
-#Split into batches
-batch_size = 32
-train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
+# #Split into batches
+# batch_size = 32
+# train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+# test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 
-# create the network
-net = SpaceshipNet()
+# # create the network
+# net = SpaceshipNet()
 
-training_loop(model=net, train_loader=train_loader, test_loader=test_loader, num_epochs=15, show_progress=True)
+# training_loop(model=net, train_loader=train_loader, test_loader=test_loader, num_epochs=15, show_progress=True)

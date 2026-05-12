@@ -4,18 +4,18 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
+import numpy as np
 
 # Create and train model
 def train_xgboost(X_train, y_train):
-    
     model = model = XGBClassifier(
     colsample_bytree=0.5,
     gamma=0.25,
     learning_rate=0.01,
     max_depth=8,
     n_estimators=1000,
-    subsample=0.9)
-
+    subsample=0.9
+)
     model.fit(X_train, y_train)
 
     return model
