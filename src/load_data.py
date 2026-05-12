@@ -42,12 +42,17 @@ def load_train_data():
     # use pd.to_numeric to convert the num column to numerical values and no longer string
     renamed_cols["num"] = pd.to_numeric(renamed_cols["num"])
 
+
+    df_extracted = df["PassengerId"].str.split(pat="_", expand=True)
+    df_extracted = df_extracted.rename(columns={0: "GroupId", 1: "Person_num"})
+
+
     # drop the irrelevant columns from original df
     df_dropped = df.drop(labels=["PassengerId", "Name", "Cabin"], axis=1)
-    # concatenate the dropped df and the 3 new cols from splitted_cols
-    combined_df = pd.concat([df_dropped, renamed_cols], axis="columns")
 
-    #print(combined_df.head())
+    # continue here with df_dropped
+    # concatenate the dropped df and the 3 new cols from splitted_cols
+    combined_df = pd.concat([df_extracted["GroupId"], df_dropped, renamed_cols], axis="columns")
 
     ## next in this part we will go over all features (cols) that have missing entries
     ## and fill the up with simple median (numerical) or mode (boolean) values
@@ -56,15 +61,33 @@ def load_train_data():
     numerical_cols = ["Age", "RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck", "num"]
     mode_cols = ["HomePlanet", "Destination", "CryoSleep", "VIP", "deck", "side"]
 
-    # fill the up with median values
+
+    # calculate the median values based on groupid (better) - this creates a sub_df
+    fill_in_values = combined_df.groupby(["GroupId"])[numerical_cols].transform('median')
+    # use this subdf to create another subdf - essentially a df with filled in values but 
+    # ONLY the numerical cols nothing else (will be concatenated later)
+    filled_median_df = combined_df[numerical_cols].fillna(fill_in_values)
+
+    #next do the same for the mode cols
+    def my_mode(series):
+        return series.mode().iloc[0]
+    
+    # create the fill in values in small df
+    fill_in_values = combined_df.groupby(["GroupId"])[mode_cols].transform(my_mode)
+    # create a subdf that has filled in values but ONLY the columns of mode cols
+    filled_modes_df = combined_df[mode_cols].fillna(fill_in_values)
+
+    # now concatenate everything together
+    combined_df = pd.concat([combined_df["GroupId"], filled_median_df, filled_modes_df, combined_df["Transported"]], axis="columns")
+
+
+    # the issue now is that ppl that travel alone (i.e. group to themselves) have no entries because 
+    # mean/mode gives no value. This means we need to find the remaining empties and fill them with global averages
+    combined_df = combined_df.fillna(combined_df[mode_cols].mode().iloc[0])
     combined_df = combined_df.fillna(combined_df[numerical_cols].median())
 
-    # cols for mode, # more difficult than before, # mode() seems to return a df where the rows
-    # contain the info we need so that's why we need to .iloc[0] to get the first row (most common)
-    combined_df = combined_df.fillna(combined_df[mode_cols].mode().iloc[0])
-
-    #print(f"this is combined_df.sum(): {combined_df.isnull().sum()}")
-    #print(combined_df.head())
+    # print(f"this is combined_df.sum(): {combined_df.isnull().sum()}")
+    # print(combined_df.head())
 
     # split categories into multiple columns, quite crazy but works
     one_hotted_df = pd.get_dummies(
@@ -113,10 +136,11 @@ class CustomTabularDataset(Dataset):
 
 
 if __name__ == "__main__":
-    X_train, X_test, y_train, y_test = load_train_data()
+    # X_train, X_test, y_train, y_test = load_train_data()
 
-    train_set = CustomTabularDataset(X_train, y_train)
+    # train_set = CustomTabularDataset(X_train, y_train)
 
-    X, y = train_set[1]
-    print(X.shape)
+    # X, y = train_set[1]
+    # print(X.shape)
+    load_train_data()
 
